@@ -156,7 +156,7 @@ class GlobalPerson(CRUDPersonBase, Base):
 
 class Source(CRUDPersonBase, Base):
     __tablename__ = 'Source'
-    id = Column(String(36), primary_key=True)
+    id = Column(String(36), primary_key=True)#
     description = Column(String(255), nullable=False)
     author = Column(String(120), nullable=True, default=None)
     date = Column(DateTime, nullable=True, default=None)
@@ -185,7 +185,7 @@ class Source(CRUDPersonBase, Base):
     def check_source_exists(cls, session, v_find):
         temp = Source.list_by_id_hide(session=session, id=v_find)
         if not temp:
-            raise ItemNotFound(message=f'didnt find source with value --> {v_find}')
+            raise ItemNotFound(message=f'didnt find any source with value --> {v_find}')
         return temp
         
 
@@ -267,7 +267,7 @@ class Person(CRUDPersonBase, Base):
                 return response    
         except Exception as err:
             print(f'exception find_by_document - {err}')
-        raise ItemNotFound(message=f'didnt find person with value --> {v_find}')
+        raise ItemNotFound(message=f'didnt find any person with value --> {v_find}')
         return False
     @classmethod
     def find_by_unique(cls, session, v_find):
@@ -291,7 +291,7 @@ class Person(CRUDPersonBase, Base):
     def check_person_exists(cls, session, v_find):
         temp = Person.find_by_unique(session=session, v_find=v_find)
         if not temp:
-            raise ItemNotFound(message=f'didnt find person with value --> {v_find}')
+            raise ItemNotFound(message=f'didnt find any person with value --> {v_find}')
         return temp
     @classmethod
     def list_by_id(
