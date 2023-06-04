@@ -542,7 +542,7 @@ class DocumentType(CRUDPersonBase, Base):
                 for que_tu_eh in tabela:
                     print(f'\n\n\n{type(que_tu_eh)} ---- {que_tu_eh}\n\n\n')
                     globals()[que_tu_eh.name]()._after_create(connection=connection)
-            #print(type(que_tu_eh.name))
+            #print(type(que_tu_eh.name))z
             # print(tabela.__class__)
             # print(dir(tabela))
             # tabela._after_create(connection=connection)
