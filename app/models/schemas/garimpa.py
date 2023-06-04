@@ -152,3 +152,6 @@ class PersonSchemaAddPremium(PersonSchemaAdd):
     documents: Optional[List[DocumentSchemaAddBase]] = None
 
 
+
+class PersonSchemaAddPremiumMass(baseSchema):
+    persons: List[PersonSchemaAddPremium]

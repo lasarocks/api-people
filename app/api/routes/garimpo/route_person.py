@@ -38,7 +38,8 @@ from app.models.schemas.garimpa import(
     PersonSchemaAddPremium,
     AddressSchemaAddAPI,
     ContactSchemaAddAPI,
-    DocumentSchemaAddAPI
+    DocumentSchemaAddAPI,
+    PersonSchemaAddPremiumMass
 )
 
 
@@ -155,6 +156,39 @@ def create_person(
         }
 
 
+
+
+
+@router.post(
+    '/person_all_mass'
+)
+def create_person_premium_mass(
+    item: PersonSchemaAddPremiumMass,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    for person in item.persons:
+        temp_create_person = Person.create(
+            session=db,
+            person_data=PersonSchemaAdd(**person.dict())
+        )
+        if temp_create_person:
+            for address in person.addresses:
+                avaddr = Address.create(
+                    session=db,
+                    data_item=AddressSchemaAddAPI(person_id=temp_create_person.id, **address.dict())
+                )
+            for contact in person.contacts:
+                avc = Contact.create(
+                    session=db,
+                    data_item=ContactSchemaAddAPI(person_id=temp_create_person.id, **contact.dict())
+                )
+            for document in person.documents:
+                avd = Document.create(
+                    session=db,
+                    data_item=DocumentSchemaAddAPI(person_id=temp_create_person.id, **document.dict())
+                )
+    return {"ok": "ok"}
 
 
 
