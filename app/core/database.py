@@ -21,7 +21,7 @@ from sqlalchemy.orm import sessionmaker
 #SQLALCHEMY_DATABASE_URL = f'postgresql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 
 
-RENDER_CONNECTION = None
+RENDER_CONNECTION = os.getenv('RENDERPOSTGRES')
 
 
 AUX_CONNECTION = 'sqlite:///CPFL-g.db?check_same_thread=False'
