@@ -48,6 +48,45 @@ router = APIRouter()
 
 
 
+@router.get(
+    '/person/random'
+)
+def give_random(
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    temp = Person.random_person(session=db)
+    if temp:
+        return {
+            "error": False,
+            "data": {
+                "id": temp.id,
+                "name": temp.name,
+                "birthday": temp.birthday,
+                "document": temp.document,
+                "source_id": temp.source_id,
+                "date_created": temp.date_created,
+                "addresses": {
+                    "total": len(temp.address_data),
+                    "data": temp.address_data
+                },
+                "contacts": {
+                    "total": len(temp.contact_data),
+                    "data": temp.contact_data
+                },
+                "documents": {
+                    "total": len(temp.document_data),
+                    "data": temp.document_data
+                }
+            }
+        }
+    else:
+        return {
+            "error": True,
+            "message": "Couldnt get api key"
+        }
+
+
 
 
 @router.get(
@@ -206,20 +245,23 @@ def create_person_premium(
     )
     if temp_create_person:
         for address in item.addresses:
-            avaddr = Address.create(
-                session=db,
-                data_item=AddressSchemaAddAPI(person_id=temp_create_person.id, **address.dict())
-            )
+            if not temp_create_person.exists_address(zipcode=address.zipcode, number=address.number):
+                avaddr = Address.create(
+                    session=db,
+                    data_item=AddressSchemaAddAPI(person_id=temp_create_person.id, **address.dict())
+                )
         for contact in item.contacts:
-            avc = Contact.create(
-                session=db,
-                data_item=ContactSchemaAddAPI(person_id=temp_create_person.id, **contact.dict())
-            )
+            if not temp_create_person.exists_contact(type_id=contact.type_id, value=contact.value):
+                avc = Contact.create(
+                    session=db,
+                    data_item=ContactSchemaAddAPI(person_id=temp_create_person.id, **contact.dict())
+                )
         for document in item.documents:
-            avd = Document.create(
-                session=db,
-                data_item=DocumentSchemaAddAPI(person_id=temp_create_person.id, **document.dict())
-            )
+            if not temp_create_person.exists_document(type_id=document.type_id, number=document.number):
+                avd = Document.create(
+                    session=db,
+                    data_item=DocumentSchemaAddAPI(person_id=temp_create_person.id, **document.dict())
+                )
     return item
     temp = Person.create(
         session=db,

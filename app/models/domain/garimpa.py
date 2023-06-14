@@ -27,6 +27,7 @@ from datetime import datetime
 from app.exceptions.serasadb_exceptions import(
     NoNameGivenError
 )
+from sqlalchemy.sql import func
 
 from app.exceptions.person_exceptions import(
     PersonNotFound
@@ -214,10 +215,51 @@ class Person(CRUDPersonBase, Base):
         person_data: PersonSchemaAdd
     ):
         avoid = Source.check_source_exists(session=session, v_find=person_data.source_id)
-        data = person_data.dict()
-        return super().create(session, data)
+        data_person = Person.find_by_unique(session=session, v_find=person_data.document)
+        if not data_person:
+            data_person = super().create(session, person_data.dict())
+        else:
+            data_person.source_id = person_data.source_id
+        return data_person
     
 
+    @classmethod
+    def random_person(cls, session):
+        try:
+            return session.query(
+                cls
+            ).outerjoin(
+                Contact,
+                Address,
+                Document
+            ).order_by(
+                func.random()
+            ).limit(
+                1
+            ).first()
+        except Exception as err:
+            print(f'exception find_by_document - {err}')
+        return False
+        
+    def exists_address(self, zipcode, number):
+        for address in self.address_data:
+            if zipcode == address.zipcode and number == address.number:
+                return True
+        return False
+    
+
+    def exists_contact(self, type_id, value):
+        for contact in self.contact_data:
+            if type_id == contact.type_id and value == contact.value:
+                return True
+        return False
+    
+
+    def exists_document(self, type_id, number):
+        for document in self.document_data:
+            if type_id == document.type_id and number == document.number:
+                return True
+        return False
     
     @classmethod
     def find_by_document(cls, session, document):
@@ -280,9 +322,6 @@ class Person(CRUDPersonBase, Base):
                     Person.document == v_find
                 )
             )
-            #).filter_by(
-            #    document=document
-            #)
             return select.first()
         except Exception as err:
             print(f'exception find_by_document - {err}')
@@ -326,9 +365,7 @@ class Address(CRUDByPersonBase, Base):
     city = Column(String(255), nullable=True, default=None)
     state = Column(String(255), nullable=True, default=None)
     source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
-    #source_id = Column(String(36), nullable=False)
     person_id = Column(String(36), ForeignKey("Person.id"), nullable=False)
-    #person_id = Column(String(36), nullable=False)
     date_created = Column(DateTime, default=datetime.utcnow())
     @classmethod
     def create(
@@ -343,7 +380,8 @@ class Address(CRUDByPersonBase, Base):
         data = data_item.dict()
         return super().create(session, data)
 
-
+    def funcao_de_classe_pae(self):
+        print('psiu')
 
     @classmethod
     def list_all(
@@ -563,24 +601,11 @@ class Document(CRUDByPersonBase, Base):
     state_issuing = Column(String(255), nullable=True)
     issuing_authority = Column(String(255), nullable=True)
     number = Column(String(255), nullable=False)
-    #source_id = Column(String(36), nullable=False)
-    #person_id = Column(String(36), nullable=False)
     source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
     person_id = Column(String(36), ForeignKey("Person.id"), nullable=False)
     date_created = Column(DateTime, default=datetime.utcnow())
-    # @classmethod
-    # def create(
-    #     cls: Base,
-    #     session: Session,
-    #     data: DocumentSchemaAdd
-    # ):
-    #     temp = Document(**data.dict())
-    #     temp.id = str(uuid.uuid4())
-    #     temp.date_created = datetime.utcnow()
-    #     session.add(temp)
-    #     session.commit()
-    #     session.refresh(temp)
-    #     return temp
+
+
     @classmethod
     def create(
         cls: Base,
