@@ -73,10 +73,7 @@ def list_all_address(
         return {"data": addresses}
     else:
         raise ItemNotFound(message=f'didnt find any data to value --> {person_id}')
-        return JSONResponse(
-            content={"error": True, "message": "Couldn't get address data"},
-            status_code=404,
-        )
+
 
 
 
