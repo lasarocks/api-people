@@ -301,9 +301,6 @@ class Person(CRUDPersonBase, Base):
                     Document.number == v_find
                 )
             )
-            #).filter_by(
-            #    document=document
-            #)
             response = select.all()
             if response:
                 return response    
