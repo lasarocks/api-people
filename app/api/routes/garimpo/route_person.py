@@ -39,7 +39,12 @@ from app.models.schemas.garimpa import(
     AddressSchemaAddAPI,
     ContactSchemaAddAPI,
     DocumentSchemaAddAPI,
-    PersonSchemaAddPremiumMass
+    PersonSchemaAddPremiumMass,
+    GlobalPersonAdd,
+    PersonDataSchemaAdd,
+    PersonDataSchemaP,
+    GlobalPersonAddBase,
+    GlobalPersonAddPremiumMass
 )
 
 
@@ -55,15 +60,16 @@ def give_random(
     response: Response,
     db: Session = Depends(get_db)
 ):
-    temp = Person.random_person(session=db)
+    temp = GlobalPerson.random_person(session=db)
     if temp:
         return {
             "error": False,
             "data": {
                 "id": temp.id,
-                "name": temp.name,
-                "birthday": temp.birthday,
-                "document": temp.document,
+                "personal": temp.person_data,
+                #"name": temp.name,
+                #"birthday": temp.birthday,
+                #"document": temp.document,
                 "source_id": temp.source_id,
                 "date_created": temp.date_created,
                 "addresses": {
@@ -97,7 +103,7 @@ def find_person_by_document(
     response: Response,
     db: Session = Depends(get_db)
 ):
-    temp = Person.find_by_person_fields(
+    temp = GlobalPerson.find_by_person_fields(
         session=db,
         v_find=document
     )
@@ -106,11 +112,10 @@ def find_person_by_document(
         for row in temp:
             temp_row_data = {
                 "id": row.id,
-                "name": row.name,
-                "birthday": row.birthday,
-                "document": row.document,
                 "source_id": row.source_id,
                 "date_created": row.date_created,
+                "personal": row.person_data,
+                #"document": row.document,
                 "addresses": {
                     "total": len(row.address_data),
                     "data": row.address_data
@@ -202,32 +207,83 @@ def create_person(
     '/person_all_mass'
 )
 def create_person_premium_mass(
-    item: PersonSchemaAddPremiumMass,
+    item: GlobalPersonAddPremiumMass,
     response: Response,
     db: Session = Depends(get_db)
 ):
     for person in item.persons:
-        temp_create_person = Person.create(
+        temp_create_person = GlobalPerson.create(
             session=db,
-            person_data=PersonSchemaAdd(**person.dict())
+            person_data=GlobalPersonAdd(source_id=item.source_id, **person.dict())
         )
         if temp_create_person:
-            for address in person.addresses:
-                avaddr = Address.create(
-                    session=db,
-                    data_item=AddressSchemaAddAPI(person_id=temp_create_person.id, **address.dict())
-                )
-            for contact in person.contacts:
-                avc = Contact.create(
-                    session=db,
-                    data_item=ContactSchemaAddAPI(person_id=temp_create_person.id, **contact.dict())
-                )
-            for document in person.documents:
-                avd = Document.create(
-                    session=db,
-                    data_item=DocumentSchemaAddAPI(person_id=temp_create_person.id, **document.dict())
-                )
+            if person.person_data and not temp_create_person.person_data:
+                av = Person.create(session=db, data_item=PersonDataSchemaP(person_id=temp_create_person.id, **person.person_data.dict()))
+            if person.addresses:
+                for address in person.addresses:
+                    if not temp_create_person.exists_address(zipcode=address.zipcode, number=address.number):
+                        avaddr = Address.create(
+                            session=db,
+                            data_item=AddressSchemaAddAPI(person_id=temp_create_person.id, **address.dict())
+                        )
+            if person.contacts:
+                for contact in person.contacts:
+                    if not temp_create_person.exists_contact(type_id=contact.type_id, value=contact.value):
+                        avc = Contact.create(
+                            session=db,
+                            data_item=ContactSchemaAddAPI(person_id=temp_create_person.id, **contact.dict())
+                        )
+            if person.documents:
+                for document in person.documents:
+                    if not temp_create_person.exists_document(type_id=document.type_id, number=document.number):
+                        avd = Document.create(
+                            session=db,
+                            data_item=DocumentSchemaAddAPI(person_id=temp_create_person.id, **document.dict())
+                        )
     return {"ok": "ok"}
+
+
+
+
+@router.post(
+    '/person_all_global'
+)
+def create_person_premium_global(
+    item: GlobalPersonAdd,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    temp_create_person = GlobalPerson.create(
+        session=db,
+        person_data=item
+    )
+    if temp_create_person:
+        if item.person_data and not temp_create_person.person_data:
+            av = Person.create(session=db, data_item=PersonDataSchemaP(person_id=temp_create_person.id, **item.person_data.dict()))
+        if item.addresses:
+            for address in item.addresses:
+                if not temp_create_person.exists_address(zipcode=address.zipcode, number=address.number):
+                    avaddr = Address.create(
+                        session=db,
+                        data_item=AddressSchemaAddAPI(person_id=temp_create_person.id, **address.dict())
+                    )
+        if item.contacts:
+            for contact in item.contacts:
+                if not temp_create_person.exists_contact(type_id=contact.type_id, value=contact.value):
+                    avc = Contact.create(
+                        session=db,
+                        data_item=ContactSchemaAddAPI(person_id=temp_create_person.id, **contact.dict())
+                    )
+        if item.documents:
+            for document in item.documents:
+                if not temp_create_person.exists_document(type_id=document.type_id, number=document.number):
+                    avd = Document.create(
+                        session=db,
+                        data_item=DocumentSchemaAddAPI(person_id=temp_create_person.id, **document.dict())
+                    )
+        return temp_create_person
+    return {"error": True}
+
 
 
 

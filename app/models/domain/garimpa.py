@@ -43,6 +43,7 @@ from app.exceptions.garimpa_exceptions import(
 from app.models.schemas.garimpa import(
     SourceSchemaAdd,
     PersonSchemaAdd,
+    PersonDataSchemaAdd,
     AddressSchemaAdd,
     AddressSchemaAddAPI,
     ContactSchemaAdd,
@@ -52,6 +53,8 @@ from app.models.schemas.garimpa import(
     DocumentSchemaAdd,
     PersonSchemaListById,
     ContactTypeSchemaAdd,
+    GlobalPersonAdd,
+    GlobalPersonAddSchema
 )
 
 
@@ -140,21 +143,6 @@ class CRUDByPersonBase(CRUDPersonBase):
 
 
 
-class GlobalPerson(CRUDPersonBase, Base):
-    __tablename__ = "GlobalPerson"
-    id = Column(String(36), primary_key=True)
-    date_created = Column(DateTime, default=datetime.utcnow)
-    
-
-
-
-
-
-
-
-
-
-
 class Source(CRUDPersonBase, Base):
     __tablename__ = 'Source'
     id = Column(String(36), primary_key=True)#
@@ -162,10 +150,11 @@ class Source(CRUDPersonBase, Base):
     author = Column(String(120), nullable=True, default=None)
     date = Column(DateTime, nullable=True, default=None)
     date_created = Column(DateTime, default=datetime.utcnow())
-    source_data = relationship('Person', backref='Source')
-    source_address = relationship('Address', backref='Source')
-    source_contact = relationship('Contact', backref='Source')
-    source_document = relationship('Document', backref='Source')
+    source_global = relationship('GlobalPerson', backref='Source')
+    # source_persondata = relationship('PersonData', backref='Source')
+    # source_address = relationship('Address', backref='Source')
+    # source_contact = relationship('Contact', backref='Source')
+    # source_document = relationship('Document', backref='Source')
     @classmethod
     def create(
         cls: Type[Base],
@@ -193,19 +182,192 @@ class Source(CRUDPersonBase, Base):
 
 
 
+
+
+class GlobalPerson(CRUDPersonBase, Base):
+    __tablename__ = "GlobalPerson"
+    id = Column(String(36), primary_key=True)
+    source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
+    date_created = Column(DateTime, default=datetime.utcnow)
+    person_data = relationship('Person', backref='GlobalPerson')
+    address_data = relationship('Address', backref='GlobalPerson')
+    contact_data = relationship('Contact', backref='GlobalPerson')
+    document_data = relationship('Document', backref='GlobalPerson')
+
+    @classmethod
+    def create(
+        cls: Base,
+        session: Session,
+        person_data: GlobalPersonAdd
+    ):
+        avoid = Source.check_source_exists(session=session, v_find=person_data.source_id)
+        data_person = GlobalPerson.find_by_unique_document(session=session, document=person_data.unique_document)
+        if not data_person:
+            data_person = super().create(session, GlobalPersonAddSchema(**person_data.dict()).dict())
+            if data_person:
+                doc_create = Document.create(session=session, data_item=DocumentSchemaAddAPI(person_id=data_person.id, type_id='cpf', number=person_data.unique_document))
+                return doc_create.GlobalPerson
+        else:
+            data_person.source_id = person_data.source_id
+        return data_person
+    
+
+    @classmethod
+    def random_person(cls, session):
+        try:
+            return session.query(
+                cls
+            ).outerjoin(
+                Person,
+                Contact,
+                Address,
+                Document
+            ).order_by(
+                func.random()
+            ).limit(
+                1
+            ).first()
+        except Exception as err:
+            print(f'exception find_by_document - {err}')
+        return False
+    
+
+    @classmethod
+    def check_global_person_exists(cls, session, v_find):
+        temp = GlobalPerson.list_by_id_hide(session=session, id=v_find)
+        if not temp:
+            raise ItemNotFound(message=f'didnt find any person with value --> {v_find}')
+        return temp
+    
+    @classmethod
+    def find_by_person_fields(cls, session, v_find):
+        try:
+            select = session.query(
+                cls
+            ).outerjoin(
+                Person,
+                Contact,
+                Address,
+                Document
+            ).filter(
+                or_(
+                    Person.id == v_find,
+                    #Person.document == v_find,
+                    Contact.value == v_find,
+                    Document.number == v_find
+                )
+            )
+            response = select.all()
+            if response:
+                return response    
+        except Exception as err:
+            print(f'exception find_by_document - {err}')
+        raise ItemNotFound(message=f'didnt find any person with value --> {v_find}')
+        return False
+    @classmethod
+    def find_by_unique_document(cls, session, document):
+        try:
+            select = session.query(
+                cls
+            ).outerjoin(
+                Document
+            ).filter(
+                and_(
+                    Document.number==document,
+                    Document.type_id=='cpf'
+                )
+            )
+            return select.first()
+        except Exception as err:
+            print(f'exception find_by_document - {err}')
+        return False
+    @classmethod
+    def find_by_unique(cls, session, v_find):
+        try:
+            select = session.query(
+                cls
+            ).filter(
+                or_(
+                    Person.id == v_find,
+                    Person.document == v_find
+                )
+            )
+            return select.first()
+        except Exception as err:
+            print(f'exception find_by_document - {err}')
+        return False
+    
+
+    def exists_address(self, zipcode, number):
+        for address in self.address_data:
+            if zipcode == address.zipcode and number == address.number:
+                return True
+        return False
+    
+
+    def exists_contact(self, type_id, value):
+        for contact in self.contact_data:
+            if type_id == contact.type_id and value == contact.value:
+                return True
+        return False
+    
+
+    def exists_document(self, type_id, number):
+        for document in self.document_data:
+            if type_id == document.type_id and number == document.number:
+                return True
+        return False
+
+
+
+
+
+
+
 class Person(CRUDPersonBase, Base):
     __tablename__ = 'Person'
     id = Column(String(36), primary_key=True)
     name = Column(String(255), nullable=False)
-    birthday = Column(String(120), nullable=False)
+    birthday = Column(DateTime, nullable=False)
+    person_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
+    source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
+    date_created = Column(DateTime, default=datetime.utcnow())
+    # address_data = relationship('Address', backref='Person')
+    # contact_data = relationship('Contact', backref='Person')
+    # document_data = relationship('Document', backref='Person')
+
+    @classmethod
+    def create(
+        cls: Base,
+        session: Session,
+        data_item: PersonDataSchemaAdd
+    ):
+        data_person = GlobalPerson.check_global_person_exists(session=session, v_find=data_item.person_id)
+        data_item.person_id = data_person.id
+        if not data_item.source_id:
+            data_item.source_id = data_person.source_id
+        data = data_item.dict()
+        return super().create(session, data)
+
+
+
+
+
+
+
+class Person33333333333(CRUDPersonBase, Base):
+    __tablename__ = 'Perso333n'
+    id = Column(String(36), primary_key=True)
+    name = Column(String(255), nullable=False)
+    birthday = Column(DateTime, nullable=False)
     document = Column(String(11), nullable=False)
     source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
     #source_id = Column(String(36), ForeignKey('registro2.id'))
     #source_id = Column(String(36), nullable=False)
     date_created = Column(DateTime, default=datetime.utcnow())
-    address_data = relationship('Address', backref='Person')
-    contact_data = relationship('Contact', backref='Person')
-    document_data = relationship('Document', backref='Person')
+    #address_data = relationship('Address', backref='Person')
+    #contact_data = relationship('Contact', backref='Person')
+    # document_data = relationship('Document', backref='Person')
 
 
     @classmethod
@@ -362,7 +524,8 @@ class Address(CRUDByPersonBase, Base):
     city = Column(String(255), nullable=True, default=None)
     state = Column(String(255), nullable=True, default=None)
     source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
-    person_id = Column(String(36), ForeignKey("Person.id"), nullable=False)
+    person_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
+    #global_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
     date_created = Column(DateTime, default=datetime.utcnow())
     @classmethod
     def create(
@@ -370,7 +533,8 @@ class Address(CRUDByPersonBase, Base):
         session: Session,
         data_item: AddressSchemaAddAPI
     ):
-        data_person = Person.check_person_exists(session=session, v_find=data_item.person_id)
+        data_person = GlobalPerson.check_global_person_exists(session=session, v_find=data_item.person_id)
+        #data_person = Person.check_person_exists(session=session, v_find=data_item.person_id)
         data_item.person_id = data_person.id
         if not data_item.source_id:
             data_item.source_id = data_person.source_id
@@ -483,7 +647,8 @@ class Contact(CRUDByPersonBase, Base):
     #source_id = Column(String(36), nullable=False)
     source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
     #person_id = Column(String(36), nullable=False)
-    person_id = Column(String(36), ForeignKey("Person.id"), nullable=False)
+    person_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
+    #global_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
     date_created = Column(DateTime, default=datetime.utcnow())
 
 
@@ -493,7 +658,8 @@ class Contact(CRUDByPersonBase, Base):
         session: Session,
         data_item: ContactSchemaAddAPI
     ):
-        data_person = Person.check_person_exists(session=session, v_find=data_item.person_id)
+        data_person = GlobalPerson.check_global_person_exists(session=session, v_find=data_item.person_id)
+        #data_person = Person.check_person_exists(session=session, v_find=data_item.person_id)
         data_item.person_id = data_person.id
         avoid = ContactType.check_type_key(session=session, key=data_item.type_id)
         if not data_item.source_id:
@@ -599,7 +765,8 @@ class Document(CRUDByPersonBase, Base):
     issuing_authority = Column(String(255), nullable=True)
     number = Column(String(255), nullable=False)
     source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
-    person_id = Column(String(36), ForeignKey("Person.id"), nullable=False)
+    person_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
+    #global_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
     date_created = Column(DateTime, default=datetime.utcnow())
 
 
@@ -609,8 +776,9 @@ class Document(CRUDByPersonBase, Base):
         session: Session,
         data_item: DocumentSchemaAddAPI
     ):
-        data_person = Person.check_person_exists(session=session, v_find=data_item.person_id)
+        data_person = GlobalPerson.check_global_person_exists(session=session, v_find=data_item.person_id)
         data_item.person_id = data_person.id
+        #data_item.global_id = data_person.id
         avoid = DocumentType.check_type_key(session=session, key=data_item.type_id)
         if not data_item.source_id:
             data_item.source_id = data_person.source_id

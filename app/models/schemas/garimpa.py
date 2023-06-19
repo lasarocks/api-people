@@ -47,15 +47,6 @@ class ContactTypeSchemaAdd(baseSchema):
 #     description: str
 
 
-class PersonSchemaAdd(baseSchema):
-    name: str
-    birthday: str
-    document: str
-    source_id: str
-
-
-
-
 
 class PersonSchemaListById(baseSchema):
     id: str
@@ -146,6 +137,30 @@ class DocumentSchemaAddAPI(DocumentSchemaAdd):
 
 
 
+class PersonDataSchemaAdd(baseSchema):
+    name: str
+    birthday: datetime
+    source_id: Optional[str] = None
+    
+
+
+
+class PersonDataSchemaP(PersonDataSchemaAdd):
+    person_id: Optional[str] = None
+
+
+
+
+class PersonSchemaAdd(baseSchema):
+    name: str
+    birthday: str
+    #document: str
+    source_id: str
+
+
+
+
+
 class PersonSchemaAddPremium(PersonSchemaAdd):
     addresses: Optional[List[AddressSchemaAddBase]] = None
     contacts: Optional[List[ContactSchemaAddBase]] = None
@@ -155,3 +170,28 @@ class PersonSchemaAddPremium(PersonSchemaAdd):
 
 class PersonSchemaAddPremiumMass(baseSchema):
     persons: List[PersonSchemaAddPremium]
+
+
+
+class GlobalPersonAddBase(baseSchema):
+    unique_document: str
+    person_data: Optional[PersonDataSchemaAdd] = None
+    addresses: Optional[List[AddressSchemaAddBase]] = None
+    contacts: Optional[List[ContactSchemaAddBase]] = None
+    documents: Optional[List[DocumentSchemaAddBase]] = None
+
+
+
+class GlobalPersonAdd(GlobalPersonAddBase):
+    source_id: str
+
+
+
+class GlobalPersonAddPremiumMass(baseSchema):
+    source_id: str
+    persons: List[GlobalPersonAddBase]
+
+
+
+class GlobalPersonAddSchema(baseSchema):
+    source_id: str
