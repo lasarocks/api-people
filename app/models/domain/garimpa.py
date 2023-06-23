@@ -15,7 +15,8 @@ from sqlalchemy.types import(
     Date,
     Boolean,
     Time,
-    DateTime
+    DateTime,
+    JSON
 )
 from typing import List, Type, Union
 
@@ -54,7 +55,13 @@ from app.models.schemas.garimpa import(
     PersonSchemaListById,
     ContactTypeSchemaAdd,
     GlobalPersonAdd,
-    GlobalPersonAddSchema
+    GlobalPersonAddSchema,
+    CustomDataTypeSchemaAdd,
+    CustomDataSchemaAddBase,
+    CustomDataSchemaAddAPI,
+    CDCCPanSchema,
+    CDPWHashSchema,
+    CDBPIXSchema
 )
 
 
@@ -193,6 +200,7 @@ class GlobalPerson(CRUDPersonBase, Base):
     address_data = relationship('Address', backref='GlobalPerson')
     contact_data = relationship('Contact', backref='GlobalPerson')
     document_data = relationship('Document', backref='GlobalPerson')
+    custom_data = relationship('CustomData', backref='GlobalPerson')
 
     @classmethod
     def create(
@@ -221,7 +229,8 @@ class GlobalPerson(CRUDPersonBase, Base):
                 Person,
                 Contact,
                 Address,
-                Document
+                Document,
+                CustomData
             ).order_by(
                 func.random()
             ).limit(
@@ -248,7 +257,8 @@ class GlobalPerson(CRUDPersonBase, Base):
                 Person,
                 Contact,
                 Address,
-                Document
+                Document,
+                CustomData
             ).filter(
                 or_(
                     Person.id == v_find,
@@ -317,6 +327,67 @@ class GlobalPerson(CRUDPersonBase, Base):
             if type_id == document.type_id and number == document.number:
                 return True
         return False
+    
+    def exists_custom(self, type_id, value):
+        t_required = {}
+        is_equal = False
+        for custom in self.custom_data:
+            if custom.type_id == type_id:
+                sample = custom.CustomDataType.base
+                is_equal = False
+                for item in sample:
+                    if sample[item].get('required', False) == True:
+                        if item not in value.keys():
+                            raise ValueError(f"CustomData.{type_id} needs {item}")
+                        else:
+                            if custom.value[item] == value.get(item):
+                                if is_equal is False:
+                                    is_equal = True
+                            elif is_equal is True:
+                                is_equal = False
+                                break
+                            else:
+                                break
+                if is_equal:
+                    return True
+        return False
+                            
+
+        # try:
+        #     ttypes = CustomDataType.check_type_key(session=None, )
+        #     required = globals()[type_id].schema()['required']
+        #     if required:
+        #         for requer in required:
+        #             if requer in value.dict().keys():
+        #                 t_required.update({
+        #                     requer: getattr(value, requer)
+        #                 })
+        #             else:
+        #                 raise ValueError(f"CustomData.{type_id} needs {requer}")
+        # except ValueError as verr:
+        #     raise verr
+        # except Exception as err:
+        #     print(f'exists custom exp - {err}')
+        # if t_required:
+        #     for custom in self.custom_data:
+        #         if custom.type_id == type_id:
+        #             is_equal = False
+        #             for r in t_required:
+        #                 print(f'kkk {r} ---- {custom.value[r]} --- {t_required[r]}')
+        #                 if custom.value[r] == t_required[r]:
+        #                     if is_equal is False:
+        #                         is_equal = True
+        #                 elif is_equal is True:
+        #                     print(f'quebrou checando {r}')
+        #                     is_equal = False
+        #                     break
+        #                     #return False
+        #                 else:
+        #                     break
+        #             if is_equal:
+        #                 return True
+        # return False
+
 
 
 
@@ -790,8 +861,103 @@ class Document(CRUDByPersonBase, Base):
 
 
 
+class CustomDataType(CRUDPersonBase, Base):
+    __tablename__ = 'CustomDataType'
+    id = Column(String(36), primary_key=True)
+    description = Column(String(255), nullable=False)
+    key = Column(String(255), unique=True, nullable=False)
+    base = Column(JSON, nullable=False)##?????????????
+    date_created = Column(DateTime, default=datetime.utcnow())
+    customdata_type_data = relationship('CustomData', backref='CustomDataType')
+    @classmethod
+    def create(
+        cls: Type[Base],
+        session: Session,
+        data_item: CustomDataTypeSchemaAdd
+    ):
+        return super().create(session, data_item.dict())
+    
+    @classmethod
+    def check_type_key(cls, session, description, key):
+        try:
+            return session.query(cls).filter_by(key=key).one()
+        except Exception as err:
+            #return CustomDataType.create(session=session, data_item=CustomDataTypeSchemaAdd(description=description, key=key))
+            print(err)
+            raise ItemNotFound(message=f'didnt find CustomDataType.type_id key --> {key}')
 
 
 
-   
+class CustomData(CRUDByPersonBase, Base):
+    __tablename__ = 'CustomData'
+    id = Column(String(36), primary_key=True)
+    type_id = Column(String(36), ForeignKey("CustomDataType.key"), nullable=False)
+    description = Column(String(255), nullable=True, default=None)
+    value = Column(JSON, nullable=False)
+    source_id = Column(String(36), ForeignKey("Source.id"), nullable=False)
+    person_id = Column(String(36), ForeignKey("GlobalPerson.id"), nullable=False)
+    date_created = Column(DateTime, default=datetime.utcnow())
+
+    @classmethod
+    def create(
+        cls: Base,
+        session: Session,
+        data_item: CustomDataSchemaAddAPI
+    ):
+        data_person = GlobalPerson.check_global_person_exists(session=session, v_find=data_item.person_id)
+        data_item.person_id = data_person.id
+        avoid = CustomDataType.check_type_key(session=session, description=data_item.description, key=data_item.type_id)
+        #check_custom_data = CustomData.exists_custom_data(session=session, person_id=data_person.id, type_id=data_item.type_id, value=data_item.value)
+        #print(check_custom_data)
+        check_custom_data = False
+        if check_custom_data:
+            raise ValueError("CustomData already exists for the person")
+        if not data_item.source_id:
+            data_item.source_id = data_person.source_id
+        data = data_item.dict()
+        return super().create(session, data)
+    
+    @classmethod
+    def exists_custom_data(cls, session: Session, person_id: str, type_id: str, value: JSON) -> bool:
+        t_required = {}
+        try:
+            required = globals()[type_id].schema()['required']
+            if required:
+                for requer in required:
+                    if requer in value.dict().keys():
+                        t_required.update({
+                            requer: getattr(value, requer)
+                        })
+                    else:
+                        raise ValueError(f"CustomData.{type_id} needs {requer}")
+        except ValueError as verr:
+            raise verr
+        except Exception as err:
+            print(f'exists custom exp - {err}')
+        if t_required:
+            select = session.query(
+                CustomData
+            ).filter_by(
+                person_id=person_id,
+                type_id=type_id
+            )
+            for item in t_required:
+                print(f'{item} - {t_required[item]}')
+                select = select.filter(
+                    text(f'json_extract(value, "$.{item}") = "{t_required[item]}"')
+                    #text(f'value[{item}] = "{t_required[item]}"')
+                )
+                #select = select.filter(
+                #    CustomData.value[item] == t_required[item]
+                #)
+            aaa = select.first() is not None
+            print(aaa)
+            return aaa
+        return False
+        return session.query(cls).filter_by(person_id=person_id, type_id=type_id).first() is not None
+
+
+
+
+
 

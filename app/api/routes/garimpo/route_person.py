@@ -22,7 +22,8 @@ from app.models.domain.garimpa import(
     Contact,
     DocumentType,
     Document,
-    GlobalPerson
+    GlobalPerson,
+    CustomData
 )
 
 
@@ -44,7 +45,10 @@ from app.models.schemas.garimpa import(
     PersonDataSchemaAdd,
     PersonDataSchemaP,
     GlobalPersonAddBase,
-    GlobalPersonAddPremiumMass
+    GlobalPersonAddPremiumMass,
+    CustomDataSchemaAdd,
+    CustomDataSchemaAddAPI,
+    CustomDataSchemaAddBase
 )
 
 
@@ -83,6 +87,10 @@ def give_random(
                 "documents": {
                     "total": len(temp.document_data),
                     "data": temp.document_data
+                },
+                "custom": {
+                    "total": len(temp.custom_data),
+                    "data": temp.custom_data
                 }
             }
         }
@@ -127,6 +135,10 @@ def find_person_by_document(
                 "documents": {
                     "total": len(row.document_data),
                     "data": row.document_data
+                },
+                "custom": {
+                    "total": len(row.custom_data),
+                    "data": row.custom_data
                 }
             }
             data_out.append(temp_row_data)
@@ -280,6 +292,13 @@ def create_person_premium_global(
                     avd = Document.create(
                         session=db,
                         data_item=DocumentSchemaAddAPI(person_id=temp_create_person.id, **document.dict())
+                    )
+        if item.custom:
+            for custom_data in item.custom:
+                if not temp_create_person.exists_custom(type_id=custom_data.type_id, value=custom_data.value):
+                    avcd = CustomData.create(
+                        session=db,
+                        data_item=CustomDataSchemaAddAPI(person_id=temp_create_person.id, **custom_data.dict())
                     )
         return temp_create_person
     return {"error": True}

@@ -10,14 +10,23 @@ from app.api.routes.garimpo import(
     route_contact,
     route_document,
     route_workhistory,
-    route_financial
+    route_financial,
+    route_customdatatype
 )
 
 
 api_router = APIRouter()
+
+#TYPES (??)
+
+api_router.include_router(route_customdatatype.router, prefix='/custom-data', tags=['types', 'customdata'])
+
+
+
 #api_router.include_router(route_serasa.router, prefix="/JustBR", tags=["serasa[justBR] - Name Research"])
 # api_router.include_router(route_garimpo.router, prefix="/prato-feito", tags=["PF"])
 api_router.include_router(route_garimpa2000.router, prefix="/garimpo", tags=["PF", "PF - garimpo analyses"])
+
 
 
 #PESSOA FISICA

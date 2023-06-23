@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import Field
+from pydantic import Field, validator
 from datetime import datetime
 from app.models.schemas.base import baseSchema
 from typing import (
@@ -35,6 +35,13 @@ class ContactTypeSchemaAdd(baseSchema):
     description: str
     key: str
 
+
+
+
+class CustomDataTypeSchemaAdd(baseSchema):
+    description: str
+    base: dict
+    key: str
 
 
 
@@ -135,6 +142,46 @@ class DocumentSchemaAddAPI(DocumentSchemaAdd):
 
 
 
+class CDCCPanSchema(baseSchema):
+    name: Optional[str] = None
+    ccpan: str
+    name_holder: Optional[str] = None
+    expiration: Optional[str] = None
+    cvv: Optional[str] = None
+
+
+class CDPWHashSchema(baseSchema):
+    name: Optional[str] = None
+    hash: str
+
+
+
+
+class CDBPIXSchema(baseSchema):
+    name: Optional[str] = None
+    chave: str
+    banco: str
+
+
+
+
+
+class CustomDataSchemaAddBase(baseSchema):
+    type_id: str
+    description: Optional[str] = None
+    value: dict
+
+
+
+class CustomDataSchemaAdd(CustomDataSchemaAddBase):
+    source_id: Optional[str] = None
+    
+
+class CustomDataSchemaAddAPI(CustomDataSchemaAdd):
+    person_id: str
+
+
+
 
 
 class PersonDataSchemaAdd(baseSchema):
@@ -179,6 +226,7 @@ class GlobalPersonAddBase(baseSchema):
     addresses: Optional[List[AddressSchemaAddBase]] = None
     contacts: Optional[List[ContactSchemaAddBase]] = None
     documents: Optional[List[DocumentSchemaAddBase]] = None
+    custom: Optional[List[CustomDataSchemaAddBase]] = None
 
 
 
